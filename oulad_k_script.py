@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
 from mlxtend.frequent_patterns import apriori, association_rules
+import matplotlib.pyplot as plt
    
 def model_fn(model_dir):
     clf = joblib.load(os.path.join(model_dir, "k_model.joblib"))
@@ -50,13 +51,6 @@ if __name__ == "__main__":
     
     print("Building training and testing datasets")
     print()
-    
-    # change  "total_score*weight"  because target column has to be numerical
-    
-    X_train = train_df.drop( label, axis=1)
-    y_train = train_df[label]
-    X_test = test_df.drop(label, axis=1)
-    y_test = test_df[label]
 
     print('Column order: ')
     print(features)
@@ -68,53 +62,97 @@ if __name__ == "__main__":
     print("Data Shape: ")
     print()
     print("---- SHAPE OF TRAINING DATA (70%) ----")
-    print(X_train.shape)
-    print(y_train.shape)
+    print(train_df.shape)
     print()
     print("---- SHAPE OF TESTING DATA (30%) ----")
-    print(X_test.shape)
-    print(y_test.shape)
+    print(test_df.shape)
     print()
     
   
     print("Training K-means Model.....")
     print()
-    
+    # Drop any rows with missing values
+    data = train_df.dropna()
+
+    # Create the feature matrix
+    X = data.iloc[:, 1:]
+
+    # Normalize the data
+    X = (X - X.mean()) / X.std()
+
+    # Determine the optimal number of clusters
+    inertias = []
+    for k in range(1, 10):
+        kmeans = KMeans(n_clusters=k, random_state=0).fit(X)
+        inertias.append(kmeans.inertia_)
+        
+    # Plot the elbow curve to determine the optimal k
+    plt.plot(range(1, 10), inertias)
+    plt.xlabel('Number of clusters')
+    plt.ylabel('Inertia')
+    plt.title('Elbow curve')
+    plt.show()
+    plt.savefig('Elbow-curve.png')
+
+    # Perform clustering with k=3
+    kmeans = KMeans(n_clusters=3, random_state=0).fit(X)
+
+    # Add the cluster labels to the dataset
+    data['Cluster'] = kmeans.labels_
+    pd.DataFrame(data).to_csv('k-means_data.csv')
+    print("kmeans.labels_-------------")
+    print(kmeans.labels_)
+    print("data['Cluster']+++++++++")
+    print(data['Cluster'])
+    # Perform association rule mining
+    # frequent_itemsets = apriori(data['Cluster'].apply(lambda x: x.values.tolist()), min_support=0.1, use_colnames=True)
+    # rules = association_rules(frequent_itemsets, metric="lift", min_threshold=0.7)
+
+    # # Print the rules
+    # print(rules)
+
+    # Visualize the clusters
+    plt.scatter(data['highest_education'], data['num_of_prev_attempts'], c=data['Cluster'])
+    plt.xlabel('highest_education')
+    plt.ylabel('num_of_prev_attempts')
+    plt.title('K-means Clustering')
+    plt.savefig('K-means.png')
+
     # Perform Simple K-means clustering with k=3 clusters
-    kmeans = KMeans(n_clusters=3)
-    kmeans.fit(X_train)
-    print("kmeans---------")
-    print(kmeans)
-    # Add cluster labels to original dataframe
-    X_train['Cluster'] = kmeans.labels_
-    print("X_train with cluster---------")
-    print(X_train)
+    # kmeans = KMeans(n_clusters=3)
+    # kmeans.fit(X_train)
+    # print("kmeans---------")
+    # print(kmeans)
+    # # Add cluster labels to original dataframe
+    # X_train['Cluster'] = kmeans.labels_
+    # print("X_train with cluster---------")
+    # print(X_train)
 
-    # Perform association rule mining on clustered data
-    frequent_itemsets = apriori(X_train.groupby('Cluster')['highest_education'], min_support=0.1, use_colnames=True)
-    rules = association_rules(frequent_itemsets, metric='lift', min_threshold=1)
+    # # Perform association rule mining on clustered data
+    # frequent_itemsets = apriori(X_train.groupby('Cluster')['highest_education'], min_support=0.1, use_colnames=True)
+    # rules = association_rules(frequent_itemsets, metric='lift', min_threshold=1)
 
-    # Print resulting association rules
-    print("rules---------")
-    print(rules)
+    # # Print resulting association rules
+    # print("rules---------")
+    # print(rules)
 
-    model = rules
-    model_path = os.path.join(args.model_dir, "k_model.joblib")
-    joblib.dump(model,model_path)
-    print("Model persisted at " + model_path)
-    print()
+    # model = rules
+    # model_path = os.path.join(args.model_dir, "k_model.joblib")
+    # joblib.dump(model,model_path)
+    # print("Model persisted at " + model_path)
+    # print()
 
     
-    y_pred_test = model.predict(X_test)
-    test_acc = accuracy_score(y_test,y_pred_test)
-    test_rep = classification_report(y_test,y_pred_test)
+    # y_pred_test = model.predict(X_test)
+    # test_acc = accuracy_score(y_test,y_pred_test)
+    # test_rep = classification_report(y_test,y_pred_test)
 
-    print()
-    print("---- METRICS RESULTS FOR TESTING DATA ----")
-    print()
-    print("Total Rows are: ", X_test.shape[0])
-    print('[TESTING] Model Accuracy is: ', test_acc)
-    print('[TESTING] Testing Report: ')
-    print(test_rep)
+    # print()
+    # print("---- METRICS RESULTS FOR TESTING DATA ----")
+    # print()
+    # print("Total Rows are: ", X_test.shape[0])
+    # print('[TESTING] Model Accuracy is: ', test_acc)
+    # print('[TESTING] Testing Report: ')
+    # print(test_rep)
     
     # result Visualisation
